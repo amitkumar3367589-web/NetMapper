@@ -1,13 +1,11 @@
-import socket
 import ipaddress
 import subprocess
 
 
 def get_ipv4_interfaces():
-    """Return active IPv4 interfaces and their network information."""
+    """Return IPv4 interfaces and their network information."""
 
     interfaces = {}
-
     result = subprocess.run(
         ["ifconfig"],
         capture_output=True,
@@ -19,18 +17,16 @@ def get_ipv4_interfaces():
 
     for line in result.stdout.splitlines():
 
-        # Interface declaration
         if line and not line.startswith((" ", "\t")) and ":" in line:
             current_interface = line.split(":")[0]
 
-        # IPv4 address
         elif current_interface and "inet " in line:
             parts = line.strip().split()
 
-            ip = parts[1]
-            netmask_hex = parts[3]
-
             try:
+                ip = parts[1]
+                netmask_hex = parts[3]
+
                 netmask = ipaddress.IPv4Address(
                     int(netmask_hex, 16)
                 )
@@ -43,7 +39,7 @@ def get_ipv4_interfaces():
                 interfaces[current_interface] = {
                     "ip": ip,
                     "netmask": str(netmask),
-                    "network": str(network),
+                    "network": network,
                     "prefix": network.prefixlen,
                 }
 
@@ -53,8 +49,45 @@ def get_ipv4_interfaces():
     return interfaces
 
 
+def select_scan_network(interfaces):
+    """
+    Select a suitable LAN network for host discovery.
+
+    Ignores loopback and /32 point-to-point networks.
+    """
+
+    candidates = []
+
+    for interface, info in interfaces.items():
+
+        network = info["network"]
+
+        # Ignore loopback
+        if network.is_loopback:
+            continue
+
+        # Ignore point-to-point /32 interfaces
+        if network.prefixlen == 32:
+            continue
+
+        candidates.append((interface, info))
+
+    if not candidates:
+        raise RuntimeError("No suitable LAN network found.")
+
+    # Prefer Wi-Fi/Ethernet-style interfaces.
+    preferred = ["en0", "en1", "en2", "en3", "en4"]
+
+    for preferred_interface in preferred:
+        for interface, info in candidates:
+            if interface == preferred_interface:
+                return interface, info
+
+    return candidates[0]
+
+
 def display_interfaces(interfaces):
-    """Display detected IPv4 interfaces."""
+    """Display detected interfaces."""
 
     print("\nNetMapper - Network Interfaces")
     print("=" * 65)
@@ -73,3 +106,10 @@ if __name__ == "__main__":
     interfaces = get_ipv4_interfaces()
 
     display_interfaces(interfaces)
+
+    interface, info = select_scan_network(interfaces)
+
+    print("\nSelected Scan Network")
+    print("=" * 65)
+    print(f"Interface : {interface}")
+    print(f"Network   : {info['network']}")
