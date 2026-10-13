@@ -1,0 +1,14 @@
+{
+    "tool": "NetMapper",
+    "generated_at": "2026-10-12T03:30:29.808854+00:00",
+    "results": [
+        {
+            "ip": "192.168.1.10",
+            "status": "UP",
+            "open_ports": [
+                80,
+                443
+            ]
+        }
+    ]
+}
